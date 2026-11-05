@@ -4,6 +4,8 @@ End-to-end ML pipeline for Breast Cancer Wisconsin (Diagnostic) dataset.
 Run: python3 train_models.py
 """
 
+import os
+import joblib
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -48,3 +50,15 @@ print(f"Test size     : {X_test.shape[0]} samples")
 print(f"Train classes : {dict(y_train.value_counts())}")
 print(f"Test classes  : {dict(y_test.value_counts())}")
 print("Scaler fitted on training data only (no leakage).")
+
+# Save held-out test split (features + diagnosis target) for Streamlit evaluation
+test_df = X_test.copy()
+test_df['diagnosis'] = y_test.values
+test_df.to_csv('test_data.csv', index=False)
+print(f"Saved held-out test dataset to test_data.csv ({test_df.shape[0]} rows, {test_df.shape[1]} columns).")
+
+# Persist preprocessing artifacts
+os.makedirs('model', exist_ok=True)
+joblib.dump(scaler, 'model/scaler.joblib')
+joblib.dump(list(X.columns), 'model/feature_names.joblib')
+print("Saved preprocessing artifacts to model/scaler.joblib and model/feature_names.joblib.")
