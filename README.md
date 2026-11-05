@@ -92,7 +92,7 @@ All five classification models were trained on the same stratified training set 
 
 ## Live Streamlit App Link
 
-- **Live Deployed Application:** `<!-- Add your Streamlit Community Cloud URL here after deploying from https://share.streamlit.io -->`
+- **Live Deployed Application:** [https://amilzith-ml-assignment-2.streamlit.app](https://amilzith-ml-assignment-2.streamlit.app)
 
 ### Local Execution Instructions
 
