@@ -50,7 +50,8 @@ ml-assignment-2/
 ├── test_data.csv                       # Held-out 20% stratified test dataset (114 rows, 31 columns)
 ├── requirements.txt                    # Python dependencies for Streamlit Community Cloud deployment
 ├── README.md                           # Project documentation, metrics comparison, and observations
-└── model/                              # Saved pre-trained classifiers and preprocessing artifacts
+└── model/                              # Saved pre-trained classifiers, source code & preprocessing artifacts
+    ├── train_models.py                 # Model training & evaluation source script
     ├── scaler.joblib                   # Fitted StandardScaler (trained on X_train only)
     ├── feature_names.joblib            # Ordered list of the 30 input feature names
     ├── logistic_regression.joblib      # Trained Logistic Regression model
