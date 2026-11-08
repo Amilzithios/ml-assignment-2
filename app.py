@@ -4,6 +4,7 @@ Interactive Streamlit Web Application for Breast Cancer Wisconsin (Diagnostic) C
 M.Tech (AIML) - Machine Learning Assignment 2 | BITS Pilani WILP
 """
 
+import io
 import os
 import joblib
 import numpy as np
@@ -38,20 +39,20 @@ st.markdown(
     .hero-banner {
         background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
         color: #f8fafc;
-        padding: 1.6rem 2rem;
+        padding: 1.5rem 2rem;
         border-radius: 14px;
-        margin-bottom: 1.4rem;
+        margin-bottom: 1.2rem;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
     }
     .hero-banner h1 {
         margin: 0;
-        font-size: 1.85rem;
+        font-size: 1.8rem;
         font-weight: 700;
         color: #ffffff;
     }
     .hero-banner p {
         margin: 0.4rem 0 0 0;
-        font-size: 0.98rem;
+        font-size: 0.96rem;
         color: #cbd5e1;
     }
     .metric-tile {
@@ -78,13 +79,14 @@ st.markdown(
     }
     .status-pill {
         display: inline-block;
-        padding: 0.25rem 0.75rem;
+        padding: 0.28rem 0.8rem;
         border-radius: 999px;
-        font-size: 0.8rem;
+        font-size: 0.82rem;
         font-weight: 600;
         background-color: #dbeafe;
         color: #1e40af;
         margin-right: 0.5rem;
+        margin-bottom: 0.4rem;
     }
     </style>
     """,
@@ -92,25 +94,34 @@ st.markdown(
 )
 
 # ── Model Registry & Artifacts Loader ────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, "model")
+DEFAULT_TEST_CSV = os.path.join(BASE_DIR, "test_data.csv")
+
 MODEL_REGISTRY = {
     "Logistic Regression": {
-        "file": "model/logistic_regression.joblib",
+        "file": os.path.join(MODEL_DIR, "logistic_regression.joblib"),
+        "short_path": "model/logistic_regression.joblib",
         "family": "Linear Discriminative Classifier (L2 Regularized, C=0.8)",
     },
     "Decision Tree": {
-        "file": "model/decision_tree.joblib",
+        "file": os.path.join(MODEL_DIR, "decision_tree.joblib"),
+        "short_path": "model/decision_tree.joblib",
         "family": "Non-Parametric CART Tree (Gini, max_depth=5, min_samples_leaf=3)",
     },
     "KNN": {
-        "file": "model/knn.joblib",
+        "file": os.path.join(MODEL_DIR, "knn.joblib"),
+        "short_path": "model/knn.joblib",
         "family": "Distance-Weighted K-Nearest Neighbors (k=7, Euclidean)",
     },
     "Naive Bayes": {
-        "file": "model/naive_bayes.joblib",
+        "file": os.path.join(MODEL_DIR, "naive_bayes.joblib"),
+        "short_path": "model/naive_bayes.joblib",
         "family": "Gaussian Probabilistic Classifier (var_smoothing=1e-8)",
     },
     "Support Vector Machine": {
-        "file": "model/svm.joblib",
+        "file": os.path.join(MODEL_DIR, "svm.joblib"),
+        "short_path": "model/svm.joblib",
         "family": "RBF Kernel Margin Classifier (C=1.5, gamma='scale')",
     },
 }
@@ -119,8 +130,8 @@ MODEL_REGISTRY = {
 @st.cache_resource
 def load_saved_artifacts():
     """Load pre-fitted scaler, feature names, and all 5 pre-trained classifiers."""
-    scaler = joblib.load("model/scaler.joblib")
-    feature_names = joblib.load("model/feature_names.joblib")
+    scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
+    feature_names = joblib.load(os.path.join(MODEL_DIR, "feature_names.joblib"))
     loaded_models = {}
     for name, meta in MODEL_REGISTRY.items():
         loaded_models[name] = joblib.load(meta["file"])
@@ -146,6 +157,14 @@ def compute_model_metrics(clf, X_scaled, y_true):
     return metrics, y_pred, y_prob
 
 
+def parse_uploaded_csv(uploaded_file):
+    """Robustly read an uploaded CSV file across browsers and encodings."""
+    uploaded_file.seek(0)
+    raw_bytes = uploaded_file.read()
+    text_content = raw_bytes.decode("utf-8-sig", errors="replace")
+    return pd.read_csv(io.StringIO(text_content))
+
+
 # ── Header Banner ────────────────────────────────────────────────────────────
 st.markdown(
     """
@@ -165,35 +184,41 @@ except Exception as err:
     )
     st.stop()
 
-# ── Sidebar Controls (Upload + Model Selection) ──────────────────────────────
-with st.sidebar:
-    st.header("⚙️ Evaluation Controls")
+# ── Top Interactive Control Panel (Main Page + Sidebar Sync) ─────────────────
+ctrl_col1, ctrl_col2 = st.columns([1.25, 1.0])
 
-    st.subheader("1. Upload Test Dataset (CSV)")
-    uploaded_csv = st.file_uploader(
-        "Upload test CSV containing 30 features + `diagnosis` column",
-        type=["csv"],
-        help="Upload test_data.csv (or custom test split with the same 30 features and 'diagnosis' target).",
+with ctrl_col1:
+    st.subheader("📂 a. Upload Test Dataset (CSV)")
+    uploaded_csv_main = st.file_uploader(
+        "Drag & drop `test_data.csv` here (must contain the 30 features + `diagnosis` column):",
+        key="main_csv_uploader",
+        help="Upload test_data.csv (or any CSV with the 30 Breast Cancer Wisconsin features and 'diagnosis' target).",
     )
 
-    if os.path.exists("test_data.csv"):
-        with open("test_data.csv", "rb") as f_test:
-            st.download_button(
-                label="⬇️ Download Sample test_data.csv",
-                data=f_test,
-                file_name="test_data.csv",
-                mime="text/csv",
-                width="stretch",
-            )
-
-    st.divider()
-    st.subheader("2. Select Classification Model")
+with ctrl_col2:
+    st.subheader("🤖 b. Select Classification Model")
     selected_model_name = st.selectbox(
-        "Choose a trained classifier to inspect:",
+        "Choose a pre-trained classifier to evaluate:",
         options=list(MODEL_REGISTRY.keys()),
         index=0,
+        key="model_selector",
     )
-    st.caption(f"**Architecture:** {MODEL_REGISTRY[selected_model_name]['family']}")
+    st.caption(
+        f"**Saved Artifact:** `{MODEL_REGISTRY[selected_model_name]['short_path']}`  \n"
+        f"**Architecture:** {MODEL_REGISTRY[selected_model_name]['family']}"
+    )
+
+# ── Sidebar Controls (Quick Download & Paste CSV Fallback) ───────────────────
+with st.sidebar:
+    st.header("⚙️ Dataset & Model Info")
+    if os.path.exists(DEFAULT_TEST_CSV):
+        with open(DEFAULT_TEST_CSV, "rb") as f_test:
+            st.download_button(
+                label="⬇️ Download test_data.csv",
+                data=f_test.read(),
+                file_name="test_data.csv",
+                mime="text/csv",
+            )
 
     st.divider()
     st.markdown(
@@ -201,19 +226,46 @@ with st.sidebar:
         **Target Encoding (`diagnosis`):**
         - `0` → **Malignant** (Cancerous)
         - `1` → **Benign** (Non-cancerous)
+
+        **Model Artifacts (`model/`):**
+        - `logistic_regression.joblib`
+        - `decision_tree.joblib`
+        - `knn.joblib`
+        - `naive_bayes.joblib`
+        - `svm.joblib`
+        - `scaler.joblib`
         """
     )
 
 # ── Load & Validate Test Data ────────────────────────────────────────────────
-if uploaded_csv is not None:
-    eval_df = pd.read_csv(uploaded_csv)
-    data_source_label = f"Uploaded CSV (`{uploaded_csv.name}`)"
-elif os.path.exists("test_data.csv"):
-    eval_df = pd.read_csv("test_data.csv")
-    data_source_label = "Bundled Held-Out Test Split (`test_data.csv`)"
+eval_df = None
+data_source_label = ""
+
+if uploaded_csv_main is not None:
+    try:
+        eval_df = parse_uploaded_csv(uploaded_csv_main)
+        data_source_label = f"Uploaded File: {uploaded_csv_main.name}"
+        st.success(
+            f"✅ Successfully uploaded and parsed **`{uploaded_csv_main.name}`** "
+            f"({len(eval_df)} test instances, {len(eval_df.columns)} columns). "
+            f"Evaluating pre-trained models without retraining."
+        )
+    except Exception as parse_err:
+        st.error(f"Could not parse uploaded CSV file: {parse_err}")
+        st.stop()
+elif os.path.exists(DEFAULT_TEST_CSV):
+    eval_df = pd.read_csv(DEFAULT_TEST_CSV)
+    data_source_label = "Default Repository Test Split (test_data.csv)"
+    st.info(
+        "ℹ️ Currently showing results on the repository's held-out **`test_data.csv`** (114 rows). "
+        "You can also upload **`test_data.csv`** (or a custom subset CSV) using the upload box above."
+    )
 else:
-    st.warning("Please upload `test_data.csv` in the sidebar to begin evaluation.")
+    st.warning("Please upload `test_data.csv` above to run evaluation.")
     st.stop()
+
+# Strip accidental whitespace from column headers
+eval_df.columns = [str(c).strip() for c in eval_df.columns]
 
 missing_cols = [c for c in expected_features if c not in eval_df.columns]
 if missing_cols or "diagnosis" not in eval_df.columns:
@@ -223,8 +275,11 @@ if missing_cols or "diagnosis" not in eval_df.columns:
     )
     st.stop()
 
-X_eval = eval_df[expected_features]
-y_eval = eval_df["diagnosis"].astype(int)
+X_eval = eval_df[expected_features].apply(pd.to_numeric, errors="coerce")
+if X_eval.isnull().any().any():
+    X_eval = X_eval.fillna(X_eval.median())
+
+y_eval = pd.to_numeric(eval_df["diagnosis"], errors="coerce").fillna(0).astype(int)
 
 # Transform using pre-fitted training scaler (strictly no refitting)
 X_eval_scaled = scaler.transform(X_eval)
@@ -240,14 +295,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.expander("🔍 Preview Active Test Dataset (First 8 Rows)", expanded=False):
-    st.dataframe(eval_df.head(8), width="stretch")
+with st.expander("🔍 Preview Active Test Dataset (First 10 Rows)", expanded=False):
+    st.dataframe(eval_df.head(10))
 
 # ── Selected Model Evaluation Section ────────────────────────────────────────
 st.markdown("---")
-st.subheader(f"📊 Detailed Evaluation: {selected_model_name}")
+st.subheader(f"📊 c. Evaluation Metrics — {selected_model_name}")
 st.caption(
-    f"Loaded artifact: `{MODEL_REGISTRY[selected_model_name]['file']}` · "
+    f"Loaded artifact: `{MODEL_REGISTRY[selected_model_name]['short_path']}` · "
     f"Specification: {MODEL_REGISTRY[selected_model_name]['family']}"
 )
 
@@ -279,12 +334,14 @@ for col, (m_name, m_val) in zip(metric_cols, metric_labels):
         )
 
 # ── Confusion Matrix & Classification Report Side-by-Side ────────────────────
+st.markdown("---")
+st.subheader(f"🧩 d. Confusion Matrix & Classification Report — {selected_model_name}")
 viz_col1, viz_col2 = st.columns([1.05, 1.15])
 
 with viz_col1:
     st.markdown("#### Confusion Matrix")
-    cm = confusion_matrix(y_eval, y_pred_active)
-    cm_pct = cm / cm.sum() * 100.0
+    cm = confusion_matrix(y_eval, y_pred_active, labels=[0, 1])
+    cm_pct = cm / max(cm.sum(), 1) * 100.0
     annot_labels = np.array(
         [
             [
@@ -322,6 +379,7 @@ with viz_col2:
     report_dict = classification_report(
         y_eval,
         y_pred_active,
+        labels=[0, 1],
         target_names=["Malignant (0)", "Benign (1)"],
         output_dict=True,
         zero_division=0,
@@ -336,7 +394,6 @@ with viz_col2:
                 "support": "{:.0f}",
             }
         ),
-        width="stretch",
         height=235,
     )
 
@@ -381,7 +438,6 @@ st.dataframe(
     comparison_df.style.highlight_max(
         subset=metric_columns, color="#dcfce7"
     ).format({col: "{:.4f}" for col in metric_columns}),
-    width="stretch",
     hide_index=True,
 )
 
