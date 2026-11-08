@@ -101,3 +101,4 @@ for model_name, (filename, clf) in classifiers.items():
 results_df = pd.DataFrame(rows)
 results_df.to_csv(os.path.join(MODEL_DIR, "metrics_summary.csv"), index=False)
 print(results_df[["ML Model Name", "Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]].to_string(index=False))
+
